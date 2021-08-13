@@ -13,6 +13,8 @@ The backend contains following resources:
 6. Virtual Network (PasswordManagerVNet) - This helps to secure resources, ensuring they are only accessible within the VNet, and not from amy other IP.
 7. API Management (PasswordManagerVNet) - This is used to expose the APIs to external applications, while ensuring security. For someone to access these APIs, along with the APIM subscription key, they will also need to pass the Azure AD access token.
 
+![image](https://user-images.githubusercontent.com/29853549/129347778-625052d3-354b-4ecd-8dad-788d5a5c3bb6.png)
+
 ## Security Overview
 1. API can only be accessed via APIM
 2. To access API, one needs APIM subscription key + Azure AD account
