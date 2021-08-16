@@ -32,6 +32,8 @@ namespace PasswordManagerFunctionApp
                 string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
                 var input = JsonConvert.DeserializeObject<Secret>(requestBody);
 
+                input.secretValue = await Helper.DecryptSecret(input.secretValue);
+
                 var result = await keyVaultClient.SetSecretAsync(keyVaultUrl, input.secretName, input.secretValue).ConfigureAwait(false);
 
                 if (result.Id != null)
@@ -68,9 +70,9 @@ namespace PasswordManagerFunctionApp
                     secretId = secretItem.Id;
                     var secretValue = await keyVaultClient.GetSecretAsync(secretId).ConfigureAwait(false);
 
-                    var encyrptedSecretValue = keyVaultClient.EncryptAsync("https://passwordmanagervault.vault.azure.net/keys/PasswordManagerEncryptionKey/51b36c3d1de14c399b733ec57b25cd3c", JsonWebKeyEncryptionAlgorithm.RSAOAEP, System.Text.Encoding.UTF8.GetBytes(secretValue.Value)).GetAwaiter().GetResult().Result;
+                    var encyrptedSecretValue = await Helper.EncryptSecret(secretValue.Value);
 
-                    Secret s = new Secret() { secretName = secretValue.SecretIdentifier.Name, secretValue = System.Text.Encoding.UTF8.GetString(encyrptedSecretValue) };
+                    Secret s = new Secret() { secretName = secretValue.SecretIdentifier.Name, secretValue = encyrptedSecretValue };
                     secretList.Add(s);
                 }
 
@@ -96,8 +98,8 @@ namespace PasswordManagerFunctionApp
 
                 if (response.Value != null)
                 {
-                    var encyrptedSecretValue = keyVaultClient.EncryptAsync(keyVaultUrl, "PasswordManagerEncryptionKey", "51b36c3d1de14c399b733ec57b25cd3c", JsonWebKeyEncryptionAlgorithm.RSAOAEP, System.Text.Encoding.UTF8.GetBytes(response.Value)).GetAwaiter().GetResult().Result;
-                    Secret s = new Secret() { secretName = response.SecretIdentifier.Name, secretValue = System.Text.Encoding.UTF8.GetString(encyrptedSecretValue) };
+                    var encyrptedSecretValue = await Helper.EncryptSecret(response.Value);
+                    Secret s = new Secret() { secretName = response.SecretIdentifier.Name, secretValue = encyrptedSecretValue };
 
                     return new OkObjectResult(s);
                 }
@@ -123,6 +125,8 @@ namespace PasswordManagerFunctionApp
             {
                 string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
                 var secret = JsonConvert.DeserializeObject<Secret>(requestBody);
+
+                secret.secretValue = await Helper.DecryptSecret(secret.secretValue);
 
                 var result = await keyVaultClient.SetSecretAsync("https://passwordmanagervault.vault.azure.net/", name, secret.secretValue).ConfigureAwait(false);
 
