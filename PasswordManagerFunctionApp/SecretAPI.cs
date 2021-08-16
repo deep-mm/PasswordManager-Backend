@@ -6,6 +6,7 @@ using Microsoft.Azure.KeyVault.WebKey;
 using Microsoft.Azure.Services.AppAuthentication;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
@@ -15,14 +16,24 @@ using System.Threading.Tasks;
 
 namespace PasswordManagerFunctionApp
 {
-    public static class SecretAPI
+    public class SecretAPI
     {
         public static AzureServiceTokenProvider azureServiceTokenProvider = new AzureServiceTokenProvider();
-        public static KeyVaultClient keyVaultClient = new KeyVaultClient(new KeyVaultClient.AuthenticationCallback(azureServiceTokenProvider.KeyVaultTokenCallback));
-        public static string keyVaultUrl = "https://passwordmanagervault.vault.azure.net/";
+        public KeyVaultClient keyVaultClient = new KeyVaultClient(new KeyVaultClient.AuthenticationCallback(azureServiceTokenProvider.KeyVaultTokenCallback));
+        public string keyVaultUrl = "";
+
+        public IConfiguration configuration { get; }
+        public Helper helper { get; }
+
+        public SecretAPI(IConfiguration configuration)
+        {
+            this.configuration = configuration;
+            keyVaultUrl = configuration["KeyVaultUri"];
+            helper = new Helper(configuration);
+        }
 
         [FunctionName("CreateSecret")]
-        public static async Task<IActionResult> CreateSecret(
+        public async Task<IActionResult> CreateSecret(
             [HttpTrigger(AuthorizationLevel.Function, "post", Route = "secret")] HttpRequest req,
             ILogger log)
         {
@@ -32,7 +43,7 @@ namespace PasswordManagerFunctionApp
                 string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
                 var input = JsonConvert.DeserializeObject<Secret>(requestBody);
 
-                input.secretValue = await Helper.DecryptSecret(input.secretValue);
+                input.secretValue = await helper.DecryptSecret(input.secretValue);
 
                 var result = await keyVaultClient.SetSecretAsync(keyVaultUrl, input.secretName, input.secretValue).ConfigureAwait(false);
 
@@ -52,7 +63,7 @@ namespace PasswordManagerFunctionApp
         }
 
         [FunctionName("GetAllSecrets")]
-        public static async Task<IActionResult> GetAllSecrets(
+        public async Task<IActionResult> GetAllSecrets(
             [HttpTrigger(AuthorizationLevel.Function, "get", Route = "secret")] HttpRequest req,
             ILogger log)
         {
@@ -70,7 +81,7 @@ namespace PasswordManagerFunctionApp
                     secretId = secretItem.Id;
                     var secretValue = await keyVaultClient.GetSecretAsync(secretId).ConfigureAwait(false);
 
-                    var encyrptedSecretValue = await Helper.EncryptSecret(secretValue.Value);
+                    var encyrptedSecretValue = await helper.EncryptSecret(secretValue.Value);
 
                     Secret s = new Secret() { secretName = secretValue.SecretIdentifier.Name, secretValue = encyrptedSecretValue };
                     secretList.Add(s);
@@ -85,7 +96,7 @@ namespace PasswordManagerFunctionApp
         }
 
         [FunctionName("GetSecretByName")]
-        public static async Task<IActionResult> GetSecretByName(
+        public async Task<IActionResult> GetSecretByName(
             [HttpTrigger(AuthorizationLevel.Function, "get", Route = "secret/{name}")] HttpRequest req,
             ILogger log, string name)
         {
@@ -98,7 +109,7 @@ namespace PasswordManagerFunctionApp
 
                 if (response.Value != null)
                 {
-                    var encyrptedSecretValue = await Helper.EncryptSecret(response.Value);
+                    var encyrptedSecretValue = await helper.EncryptSecret(response.Value);
                     Secret s = new Secret() { secretName = response.SecretIdentifier.Name, secretValue = encyrptedSecretValue };
 
                     return new OkObjectResult(s);
@@ -115,7 +126,7 @@ namespace PasswordManagerFunctionApp
         }
 
         [FunctionName("UpdateSecret")]
-        public static async Task<IActionResult> UpdateSecret(
+        public async Task<IActionResult> UpdateSecret(
             [HttpTrigger(AuthorizationLevel.Function, "put", Route = "secret/{name}")] HttpRequest req,
             ILogger log, string name)
         {
@@ -126,7 +137,7 @@ namespace PasswordManagerFunctionApp
                 string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
                 var secret = JsonConvert.DeserializeObject<Secret>(requestBody);
 
-                secret.secretValue = await Helper.DecryptSecret(secret.secretValue);
+                secret.secretValue = await helper.DecryptSecret(secret.secretValue);
 
                 var result = await keyVaultClient.SetSecretAsync("https://passwordmanagervault.vault.azure.net/", name, secret.secretValue).ConfigureAwait(false);
 
@@ -146,7 +157,7 @@ namespace PasswordManagerFunctionApp
         }
 
         [FunctionName("DeleteSecret")]
-        public static async Task<IActionResult> DeleteSecret(
+        public async Task<IActionResult> DeleteSecret(
             [HttpTrigger(AuthorizationLevel.Function, "delete", Route = "secret/{name}")] HttpRequest req,
             ILogger log, string name)
         {

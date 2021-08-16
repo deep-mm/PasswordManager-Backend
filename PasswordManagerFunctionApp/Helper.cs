@@ -1,6 +1,7 @@
 ﻿using Microsoft.Azure.KeyVault;
 using Microsoft.Azure.KeyVault.WebKey;
 using Microsoft.Azure.Services.AppAuthentication;
+using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -8,13 +9,19 @@ using System.Threading.Tasks;
 
 namespace PasswordManagerFunctionApp
 {
-    public static class Helper
+    public class Helper
     {
         public static AzureServiceTokenProvider azureServiceTokenProvider = new AzureServiceTokenProvider();
         public static KeyVaultClient keyVaultClient = new KeyVaultClient(new KeyVaultClient.AuthenticationCallback(azureServiceTokenProvider.KeyVaultTokenCallback));
-        public static string encryptionKeyUri = "https://passwordmanagervault.vault.azure.net/keys/PasswordManagerEncryptionKey/51b36c3d1de14c399b733ec57b25cd3c";
+        public static string encryptionKeyUri = "";
+        public IConfiguration configuration { get; }
+        public Helper (IConfiguration configuration)
+        {
+            this.configuration = configuration;
+            encryptionKeyUri = configuration["KeyVaultEncryptionKeyUrl"];
+        }
 
-        public static async Task<string> DecryptSecret(string encryptedSecret)
+        public async Task<string> DecryptSecret(string encryptedSecret)
         {
             try
             {
@@ -28,7 +35,7 @@ namespace PasswordManagerFunctionApp
             }
         }
 
-        public static async Task<string> EncryptSecret(string decryptedSecret)
+        public async Task<string> EncryptSecret(string decryptedSecret)
         {
             try
             {
