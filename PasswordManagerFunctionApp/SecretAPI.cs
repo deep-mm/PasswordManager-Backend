@@ -180,5 +180,30 @@ namespace PasswordManagerFunctionApp
                 return new BadRequestObjectResult("Error Occured: Failed to delete secret in keyvault");
             }
         }
+
+        [FunctionName("EncryptDecrypt")]
+        public async Task<IActionResult> EncryptDecrypt(
+            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "secret/ed/{name}")] HttpRequest req,
+            ILogger log, string name)
+        {
+            log.LogInformation("Encrypting this secret: " + name + " using KeyVault");
+
+            try
+            {
+                var encryptedSecret = await helper.EncryptSecret(name);
+
+                log.LogInformation("Encrypted value is: " + encryptedSecret);
+
+                var decryptedSecret = await helper.DecryptSecret(encryptedSecret);
+
+                log.LogInformation("Decrypted value is: " + decryptedSecret);
+
+                return new OkObjectResult($"Encrypt Decrypt successful. Encrypted value is: {encryptedSecret}. Decrypted value is: {decryptedSecret}");
+            }
+            catch (Exception e)
+            {
+                return new BadRequestObjectResult("Error Occured: Failed to delete secret in keyvault. Exception: "+e);
+            }
+        }
     }
 }
