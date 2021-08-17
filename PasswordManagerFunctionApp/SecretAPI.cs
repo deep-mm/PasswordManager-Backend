@@ -78,12 +78,19 @@ namespace PasswordManagerFunctionApp
                 foreach (Microsoft.Azure.KeyVault.Models.SecretItem secretItem in response.Result)
                 {
                     secretId = secretItem.Id;
-                    var secretValue = await keyVaultClient.GetSecretAsync(secretId).ConfigureAwait(false);
+                    if (secretId.Contains("APIMICROSOFTPROVIDERAUTHENTICATIONSECRET") || secretId.Contains("AzureADClientSecret") || secretId.Contains("AzureWebJobsStorage"))
+                    {
+                        continue;
+                    }
+                    else
+                    {
+                        var secretValue = await keyVaultClient.GetSecretAsync(secretId).ConfigureAwait(false);
 
-                    var encyrptedSecretValue = await helper.EncryptSecret(secretValue.Value);
+                        var encyrptedSecretValue = await helper.EncryptSecret(secretValue.Value);
 
-                    Secret s = new Secret() { secretName = secretValue.SecretIdentifier.Name, secretValue = encyrptedSecretValue };
-                    secretList.Add(s);
+                        Secret s = new Secret() { secretName = secretValue.SecretIdentifier.Name, secretValue = encyrptedSecretValue };
+                        secretList.Add(s);
+                    }
                 }
 
                 return new OkObjectResult(secretList);
